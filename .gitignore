@@ -48,7 +48,6 @@ dist-ssr
 *.tsbuildinfo
 docs/context.md
 docs/development_plan.md
-.gitignore
 
 # Nested Git repository
 RedDrop/
