@@ -6,6 +6,7 @@ import SignUpPage from './features/auth/pages/SignUpPage';
 import ResetPasswordPage from './features/auth/pages/ResetPasswordPage';
 import DonorProfilePage from './features/donor/pages/DonorProfilePage';
 import DonorRegistrationPage from './features/donor/pages/DonorRegistrationPage';
+import { NotificationPage } from './features/notification';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 
@@ -61,6 +62,9 @@ const App: React.FC = () => {
                 <Route path="profile" element={<DonorProfilePage />} />
                 <Route path="register" element={<DonorRegistrationPage />} />
               </Route>
+              
+              {/* Notification routes */}
+              <Route path="/notifications" element={<NotificationPage />} />
               
               {/* Add more protected routes here */}
             </Route>

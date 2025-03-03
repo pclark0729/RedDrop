@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { NotificationBadge } from '../../features/notification';
+import { useAuth } from '../../features/auth';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   return (
     <header className="bg-white shadow-sm">
@@ -43,16 +46,32 @@ const Header: React.FC = () => {
             </nav>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            <div className="ml-3 relative">
-              <div>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  Login
-                </Link>
+            {isAuthenticated ? (
+              <>
+                <NotificationBadge className="mr-4" />
+                <div className="ml-3 relative">
+                  <div>
+                    <Link
+                      to="/profile"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      My Profile
+                    </Link>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="ml-3 relative">
+                <div>
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    Login
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="-mr-2 flex items-center sm:hidden">
             <button
@@ -125,12 +144,29 @@ const Header: React.FC = () => {
             >
               Request Blood
             </Link>
-            <Link
-              to="/login"
-              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-            >
-              Login
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/notifications"
+                  className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+                >
+                  Notifications
+                </Link>
+                <Link
+                  to="/profile"
+                  className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+                >
+                  My Profile
+                </Link>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              >
+                Login
+              </Link>
+            )}
           </div>
         </div>
       )}
