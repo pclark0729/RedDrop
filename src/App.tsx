@@ -7,6 +7,9 @@ import ResetPasswordPage from './features/auth/pages/ResetPasswordPage';
 import DonorProfilePage from './features/donor/pages/DonorProfilePage';
 import DonorRegistrationPage from './features/donor/pages/DonorRegistrationPage';
 import { NotificationPage } from './features/notification';
+import Dashboard from './pages/Dashboard';
+import ProfilePage from './pages/ProfilePage';
+import LandingPage from './pages/LandingPage';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 
@@ -21,22 +24,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-// Placeholder Dashboard component - will be replaced with actual dashboard later
-const Dashboard = () => (
-  <div className="container mx-auto p-8">
-    <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-    <p>Welcome to the Blood Donation Management System!</p>
-  </div>
-);
-
-// Placeholder Home component - will be replaced with actual home page later
-const Home = () => (
-  <div className="container mx-auto p-8">
-    <h1 className="text-2xl font-bold mb-4">Blood Donation Management System</h1>
-    <p>Welcome to the Blood Donation Management System. Please sign in or sign up to continue.</p>
-  </div>
-);
-
 const App: React.FC = () => {
   return (
     <AuthProvider>
@@ -44,7 +31,7 @@ const App: React.FC = () => {
         <Layout>
           <Routes>
             {/* Public routes */}
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<LandingPage />} />
             
             {/* Auth routes */}
             <Route path="/auth">
@@ -56,6 +43,7 @@ const App: React.FC = () => {
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<ProfilePage />} />
               
               {/* Donor routes */}
               <Route path="/donor">
