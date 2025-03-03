@@ -1,5 +1,5 @@
 // Context
-export { AuthProvider, useAuth } from './context/AuthContext';
+export { AuthProvider, useAuthContext } from './context/AuthContext';
 
 // Components
 export { default as SignInForm } from './components/SignInForm';
@@ -14,6 +14,7 @@ export { default as ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // Hooks
 export { default as useAuthForm } from './hooks/useAuthForm';
+export { default as useAuth } from './hooks/useAuth';
 
 // Services
 export { default as authService } from './services/authService'; 
