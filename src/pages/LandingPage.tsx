@@ -1,54 +1,105 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../features/auth';
+import {
+  Box,
+  Button,
+  Container,
+  Flex,
+  Heading,
+  Image,
+  Link,
+  Stack,
+  Text,
+  VStack,
+  useColorModeValue
+} from '@chakra-ui/react';
 
 const LandingPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
   
+  useEffect(() => {
+    console.log("LandingPage component rendered");
+    console.log("Auth state:", { user, isAuthenticated });
+  }, [user, isAuthenticated]);
+
   return (
-    <div className="bg-white">
+    <Box>
       {/* Hero Section */}
-      <div className="relative bg-red-600">
-        <div className="absolute inset-0">
-          <img
-            className="w-full h-full object-cover"
+      <Box position="relative" bg="red.600">
+        <Box position="absolute" inset="0">
+          <Image
+            w="full"
+            h="full"
+            objectFit="cover"
             src="https://images.unsplash.com/photo-1615461066841-6116e61058f4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80"
             alt="Blood donation"
+            opacity="0.7"
           />
-          <div className="absolute inset-0 bg-red-700 mix-blend-multiply" aria-hidden="true"></div>
-        </div>
-        <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">RedDrop</h1>
-          <p className="mt-6 text-xl text-red-100 max-w-3xl">
-            Connecting blood donors with those in need. Save lives with just a few clicks.
-          </p>
-          <div className="mt-10 flex space-x-4">
-            {isAuthenticated ? (
-              <Link
-                to="/dashboard"
-                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          <Box position="absolute" inset="0" bg="red.900" opacity="0.5" />
+        </Box>
+        <Container maxW="container.xl" position="relative">
+          <Stack
+            direction={{ base: 'column', md: 'row' }}
+            spacing={{ base: 8, md: 10 }}
+            py={{ base: 20, md: 28 }}
+            align="center"
+          >
+            <VStack
+              flex={1}
+              spacing={{ base: 5, md: 10 }}
+              textAlign={{ base: 'center', md: 'left' }}
+            >
+              <Heading
+                lineHeight={1.1}
+                fontWeight={600}
+                fontSize={{ base: '3xl', sm: '4xl', lg: '6xl' }}
+                color="white"
               >
-                Go to Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/auth/signin"
-                  className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                <Text as="span">
+                  Donate Blood,
+                </Text>
+                <Text as="span" color="red.200">
+                  Save Lives
+                </Text>
+              </Heading>
+              <Text color="gray.100" fontSize={{ base: 'lg', md: 'xl' }}>
+                Join our community of blood donors and help save lives. Your donation can make a difference.
+              </Text>
+              <Stack
+                spacing={{ base: 4, sm: 6 }}
+                direction={{ base: 'column', sm: 'row' }}
+              >
+                <Button
+                  as={RouterLink}
+                  to={isAuthenticated ? '/dashboard' : '/auth/signin'}
+                  rounded="full"
+                  size="lg"
+                  fontWeight="bold"
+                  px={6}
+                  colorScheme="red"
+                  bg="red.500"
+                  _hover={{ bg: 'red.600' }}
                 >
-                  Sign In
-                </Link>
-                <Link
-                  to="/auth/signup"
-                  className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-red-800 bg-opacity-60 hover:bg-opacity-70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  {isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
+                </Button>
+                <Button
+                  as={RouterLink}
+                  to="/donor/register"
+                  rounded="full"
+                  size="lg"
+                  fontWeight="bold"
+                  px={6}
+                  colorScheme="whiteAlpha"
                 >
-                  Sign Up
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+                  Become a Donor
+                </Button>
+              </Stack>
+            </VStack>
+          </Stack>
+        </Container>
+      </Box>
       
       {/* Features Section */}
       <div className="py-16 bg-gray-50 overflow-hidden">
@@ -220,7 +271,7 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </Box>
   );
 };
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Flex, Spinner } from '@chakra-ui/react';
 import { useAuth } from '../hooks/useAuth';
 
 const ProtectedRoute: React.FC = () => {
@@ -9,9 +10,9 @@ const ProtectedRoute: React.FC = () => {
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
+      <Flex justify="center" align="center" height="100vh">
+        <Spinner size="xl" color="red.500" thickness="4px" />
+      </Flex>
     );
   }
 

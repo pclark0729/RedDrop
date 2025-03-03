@@ -1,324 +1,587 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Container,
   Heading,
   Text,
-  VStack,
-  HStack,
-  Button,
   Tabs,
   TabList,
   TabPanels,
   Tab,
   TabPanel,
-  Badge,
   Flex,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  SimpleGrid,
+  Icon,
+  useColorModeValue,
+  Button,
+  HStack,
+  VStack,
+  Badge,
+  Divider,
+  useToast,
   Spinner,
-  Center,
   Alert,
   AlertIcon,
   AlertTitle,
   AlertDescription,
-  SimpleGrid,
-  Card,
-  CardHeader,
-  CardBody,
-  CardFooter,
-  Divider,
-  Icon,
-  useDisclosure,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  Select,
-  FormControl,
-  FormLabel
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink
 } from '@chakra-ui/react';
-import { 
-  FaUserCheck, 
-  FaUserTimes, 
-  FaUserClock, 
-  FaCheckCircle, 
-  FaTimesCircle, 
-  FaHospital, 
-  FaTint, 
-  FaCalendarAlt,
-  FaMapMarkerAlt,
-  FaSearch
-} from 'react-icons/fa';
-import { format } from 'date-fns';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
+import { FaUsers, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaChevronRight, FaArrowLeft } from 'react-icons/fa';
 import { useMatching } from '../hooks/useMatching';
-import { DonorMatch, MatchStatus } from '../types';
-import { useBloodRequest } from '../../bloodRequest/hooks/useBloodRequest';
-import { BloodRequest } from '../../bloodRequest/types';
+import MatchList from '../components/MatchList';
+import { MatchStatus } from '../types';
 
-export const RequestMatchesPage: React.FC = () => {
+const RequestMatchesPage: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
-  const navigate = useNavigate();
   const { 
-    matches, 
-    loading, 
-    error, 
-    getMatchesByRequestId 
+    getMatchesByRequestId, 
+    getBloodRequestById,
+    updateMatch, 
+    cancelMatch, 
+    isLoading, 
+    error 
   } = useMatching();
-  const { getBloodRequestById } = useBloodRequest();
-  
-  const [request, setRequest] = useState<BloodRequest | null>(null);
-  const [statusFilter, setStatusFilter] = useState<MatchStatus | 'ALL'>('ALL');
-  const [filteredMatches, setFilteredMatches] = useState<DonorMatch[]>([]);
-  
+  const [matches, setMatches] = useState([]);
+  const [request, setRequest] = useState(null);
+  const [tabIndex, setTabIndex] = useState(0);
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const statBg = useColorModeValue('brand.50', 'gray.700');
+
   useEffect(() => {
     if (requestId) {
-      loadData();
+      loadData(requestId);
     }
   }, [requestId]);
-  
-  useEffect(() => {
-    if (matches.length > 0) {
-      filterMatches();
-    }
-  }, [matches, statusFilter]);
-  
-  const loadData = async () => {
-    if (requestId) {
-      await getMatchesByRequestId(requestId);
-      const requestData = await getBloodRequestById(requestId);
+
+  const loadData = async (id: string) => {
+    try {
+      const [matchesData, requestData] = await Promise.all([
+        getMatchesByRequestId(id),
+        getBloodRequestById(id)
+      ]);
+      
+      if (matchesData) {
+        setMatches(matchesData);
+      }
+      
       if (requestData) {
         setRequest(requestData);
       }
+    } catch (err) {
+      toast({
+        title: 'Error loading data',
+        description: 'There was a problem loading the matches for this request.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
-  
-  const filterMatches = () => {
-    if (statusFilter === 'ALL') {
-      setFilteredMatches(matches);
-    } else {
-      setFilteredMatches(matches.filter(match => match.status === statusFilter));
+
+  const handleComplete = async (matchId: string, notes?: string, donationDate?: string) => {
+    try {
+      await updateMatch(matchId, { 
+        status: MatchStatus.COMPLETED,
+        notes: notes || undefined,
+        donation_time: donationDate ? new Date(donationDate).toISOString() : new Date().toISOString()
+      });
+      
+      // Refresh matches after update
+      if (requestId) {
+        const updatedMatches = await getMatchesByRequestId(requestId);
+        if (updatedMatches) {
+          setMatches(updatedMatches);
+        }
+      }
+      
+      toast({
+        title: 'Donation completed',
+        description: 'The donation has been marked as completed.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error completing donation',
+        description: 'There was a problem marking this donation as complete. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
-  
-  const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatusFilter(e.target.value as MatchStatus | 'ALL');
-  };
-  
-  const getStatusIcon = (status: MatchStatus) => {
-    switch (status) {
-      case MatchStatus.PENDING:
-        return <Icon as={FaUserClock} color="yellow.500" boxSize={5} />;
-      case MatchStatus.ACCEPTED:
-        return <Icon as={FaUserCheck} color="green.500" boxSize={5} />;
-      case MatchStatus.DECLINED:
-        return <Icon as={FaUserTimes} color="red.500" boxSize={5} />;
-      case MatchStatus.COMPLETED:
-        return <Icon as={FaCheckCircle} color="blue.500" boxSize={5} />;
-      case MatchStatus.CANCELLED:
-        return <Icon as={FaTimesCircle} color="gray.500" boxSize={5} />;
-      default:
-        return null;
+
+  const handleCancel = async (matchId: string, reason?: string) => {
+    try {
+      await cancelMatch(matchId, reason);
+      
+      // Refresh matches after update
+      if (requestId) {
+        const updatedMatches = await getMatchesByRequestId(requestId);
+        if (updatedMatches) {
+          setMatches(updatedMatches);
+        }
+      }
+      
+      toast({
+        title: 'Match cancelled',
+        description: 'The donation match has been cancelled.',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error cancelling match',
+        description: 'There was a problem cancelling this match. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     }
   };
-  
-  const getStatusBadge = (status: MatchStatus) => {
-    switch (status) {
-      case MatchStatus.PENDING:
-        return <Badge colorScheme="yellow">Pending</Badge>;
-      case MatchStatus.ACCEPTED:
-        return <Badge colorScheme="green">Accepted</Badge>;
-      case MatchStatus.DECLINED:
-        return <Badge colorScheme="red">Declined</Badge>;
-      case MatchStatus.COMPLETED:
-        return <Badge colorScheme="blue">Completed</Badge>;
-      case MatchStatus.CANCELLED:
-        return <Badge colorScheme="gray">Cancelled</Badge>;
-      default:
-        return <Badge>Unknown</Badge>;
-    }
+
+  const handleGoBack = () => {
+    navigate('/requests');
   };
-  
-  const renderMatchCard = (match: DonorMatch) => {
+
+  const pendingMatches = matches.filter(match => match.status === MatchStatus.PENDING);
+  const acceptedMatches = matches.filter(match => match.status === MatchStatus.ACCEPTED);
+  const completedMatches = matches.filter(match => match.status === MatchStatus.COMPLETED);
+  const declinedMatches = matches.filter(match => 
+    match.status === MatchStatus.DECLINED || match.status === MatchStatus.CANCELLED
+  );
+
+  if (isLoading) {
     return (
-      <Card key={match.id} borderRadius="lg" boxShadow="md" overflow="hidden">
-        <CardHeader bg="gray.50" pb={3}>
-          <HStack justifyContent="space-between">
-            <HStack>
-              {getStatusIcon(match.status)}
-              <Heading size="md">
-                {match.donor_name || 'Anonymous Donor'}
-              </Heading>
-            </HStack>
-            {getStatusBadge(match.status)}
-          </HStack>
-        </CardHeader>
-        
-        <CardBody>
-          <VStack align="stretch" spacing={3}>
-            <HStack>
-              <Icon as={FaTint} color="red.500" />
-              <Text fontWeight="medium">Blood Type: {match.donor_blood_type}</Text>
-            </HStack>
-            
-            {match.response_time && match.status !== MatchStatus.PENDING && (
-              <HStack>
-                <Icon as={FaCalendarAlt} color="blue.500" />
-                <Text>
-                  Responded on {format(new Date(match.response_time), 'MMM dd, yyyy')}
-                </Text>
-              </HStack>
-            )}
-            
-            {match.donation_time && match.status === MatchStatus.COMPLETED && (
-              <HStack>
-                <Icon as={FaCalendarAlt} color="green.500" />
-                <Text>
-                  Donated on {format(new Date(match.donation_time), 'MMM dd, yyyy')}
-                </Text>
-              </HStack>
-            )}
-            
-            {match.notes && (
-              <Box mt={2} p={3} bg="gray.50" borderRadius="md">
-                <Text fontSize="sm" fontStyle="italic">
-                  {match.notes}
-                </Text>
-              </Box>
-            )}
-          </VStack>
-        </CardBody>
-        
-        {(match.donor_phone || match.donor_email) && match.status === MatchStatus.ACCEPTED && (
-          <>
-            <Divider />
-            <CardFooter pt={3}>
-              <VStack align="stretch" width="100%" spacing={2}>
-                <Heading size="xs" color="gray.600">Contact Information</Heading>
-                {match.donor_phone && (
-                  <Text fontSize="sm">
-                    Phone: {match.donor_phone}
-                  </Text>
-                )}
-                {match.donor_email && (
-                  <Text fontSize="sm">
-                    Email: {match.donor_email}
-                  </Text>
-                )}
-              </VStack>
-            </CardFooter>
-          </>
-        )}
-      </Card>
-    );
-  };
-  
-  if (loading) {
-    return (
-      <Center p={8}>
-        <Spinner size="xl" color="blue.500" />
-      </Center>
+      <Container maxW="container.xl" py={8}>
+        <Flex justify="center" align="center" direction="column" minH="50vh">
+          <Spinner size="xl" color="brand.500" thickness="4px" speed="0.65s" />
+          <Text mt={4} color="gray.600">Loading matches...</Text>
+        </Flex>
+      </Container>
     );
   }
-  
+
   if (error) {
     return (
-      <Alert status="error" borderRadius="md">
-        <AlertIcon />
-        <AlertTitle>Error!</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <Container maxW="container.xl" py={8}>
+        <Alert status="error" borderRadius="md" mb={6}>
+          <AlertIcon />
+          <AlertTitle mr={2}>Error loading matches!</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button leftIcon={<FaArrowLeft />} onClick={handleGoBack} colorScheme="brand" variant="outline">
+          Back to Requests
+        </Button>
+      </Container>
     );
   }
-  
+
+  if (!request) {
+    return (
+      <Container maxW="container.xl" py={8}>
+        <Alert status="warning" borderRadius="md" mb={6}>
+          <AlertIcon />
+          <AlertTitle mr={2}>Request not found!</AlertTitle>
+          <AlertDescription>The blood request you're looking for doesn't exist or has been removed.</AlertDescription>
+        </Alert>
+        <Button leftIcon={<FaArrowLeft />} onClick={handleGoBack} colorScheme="brand" variant="outline">
+          Back to Requests
+        </Button>
+      </Container>
+    );
+  }
+
   return (
     <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} align="stretch">
+      <VStack spacing={6} align="stretch">
         <Box>
-          <Button 
-            variant="link" 
-            colorScheme="blue" 
-            onClick={() => navigate('/requests')}
-            mb={4}
+          <Breadcrumb separator={<Icon as={FaChevronRight} color="gray.500" fontSize="xs" />} mb={4}>
+            <BreadcrumbItem>
+              <BreadcrumbLink as={RouterLink} to="/dashboard" color="brand.500">
+                Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbItem>
+              <BreadcrumbLink as={RouterLink} to="/requests" color="brand.500">
+                My Requests
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbItem isCurrentPage>
+              <BreadcrumbLink color="gray.500">Request Matches</BreadcrumbLink>
+            </BreadcrumbItem>
+          </Breadcrumb>
+
+          <Flex 
+            justify="space-between" 
+            align={{ base: "flex-start", md: "center" }}
+            direction={{ base: "column", md: "row" }}
+            gap={4}
+            mb={6}
           >
-            ← Back to Blood Requests
-          </Button>
-          
-          <Heading size="xl" mb={2}>
-            Donation Matches
-          </Heading>
-          
-          {request && (
-            <Box bg="white" p={4} borderRadius="md" boxShadow="sm" mb={6}>
-              <Heading size="md" mb={3}>Request Details</Heading>
-              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                <HStack>
-                  <Icon as={FaTint} color="red.500" />
-                  <Text fontWeight="medium">
-                    Blood Type: {request.blood_type} ({request.units_needed} units)
-                  </Text>
-                </HStack>
-                
-                <HStack>
-                  <Icon as={FaHospital} color="blue.500" />
-                  <Text fontWeight="medium">{request.hospital_name}</Text>
-                </HStack>
-                
-                <HStack>
-                  <Icon as={FaMapMarkerAlt} color="green.500" />
-                  <Text>
-                    {request.hospital_city}, {request.hospital_state}
-                  </Text>
-                </HStack>
-              </SimpleGrid>
-            </Box>
-          )}
-        </Box>
-        
-        <Box>
-          <Flex justifyContent="space-between" alignItems="center" mb={4}>
-            <Heading size="md">
-              <HStack>
-                <Icon as={FaSearch} color="blue.500" />
-                <Text>Donor Matches</Text>
-              </HStack>
-            </Heading>
-            
-            <FormControl maxW="200px">
-              <Select 
-                value={statusFilter} 
-                onChange={handleStatusFilterChange}
-                size="sm"
+            <Box>
+              <Heading 
+                as="h1" 
+                size="xl" 
+                mb={2}
+                bgGradient="linear(to-r, brand.500, brand.700)"
+                bgClip="text"
               >
-                <option value="ALL">All Statuses</option>
-                <option value={MatchStatus.PENDING}>Pending</option>
-                <option value={MatchStatus.ACCEPTED}>Accepted</option>
-                <option value={MatchStatus.COMPLETED}>Completed</option>
-                <option value={MatchStatus.DECLINED}>Declined</option>
-                <option value={MatchStatus.CANCELLED}>Cancelled</option>
-              </Select>
-            </FormControl>
+                Matches for Blood Request
+              </Heading>
+              <Text color="gray.600">
+                View and manage potential donors for your blood request
+              </Text>
+            </Box>
+            <Button 
+              leftIcon={<FaArrowLeft />} 
+              onClick={handleGoBack}
+              colorScheme="brand" 
+              variant="outline"
+              size="md"
+            >
+              Back to Requests
+            </Button>
           </Flex>
-          
-          {filteredMatches.length === 0 ? (
-            <Alert status="info" borderRadius="md">
-              <AlertIcon />
-              <AlertTitle>No matches found</AlertTitle>
-              <AlertDescription>
-                {statusFilter === 'ALL' 
-                  ? "There are no donor matches for this blood request yet." 
-                  : `There are no ${statusFilter.toLowerCase()} matches for this blood request.`
-                }
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-              {filteredMatches.map(match => renderMatchCard(match))}
-            </SimpleGrid>
-          )}
+        </Box>
+
+        {/* Request Details */}
+        <Box 
+          p={6} 
+          borderRadius="lg" 
+          bg={bgColor}
+          borderWidth="1px"
+          borderColor={borderColor}
+          boxShadow="md"
+        >
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            <VStack align="stretch" spacing={4}>
+              <Heading size="md">Request Details</Heading>
+              <Divider />
+              <HStack>
+                <Text fontWeight="bold" minW="120px">Blood Type:</Text>
+                <Badge 
+                  colorScheme="brand" 
+                  fontSize="lg" 
+                  px={3} 
+                  py={1} 
+                  borderRadius="md"
+                >
+                  {request.blood_type}
+                </Badge>
+              </HStack>
+              <HStack>
+                <Text fontWeight="bold" minW="120px">Units Needed:</Text>
+                <Text>{request.units_needed}</Text>
+              </HStack>
+              <HStack>
+                <Text fontWeight="bold" minW="120px">Urgency:</Text>
+                <Badge 
+                  colorScheme={
+                    request.urgency_level === 'HIGH' ? 'red' : 
+                    request.urgency_level === 'MEDIUM' ? 'orange' : 'green'
+                  }
+                >
+                  {request.urgency_level}
+                </Badge>
+              </HStack>
+              <HStack align="flex-start">
+                <Text fontWeight="bold" minW="120px">Hospital:</Text>
+                <VStack align="start" spacing={0}>
+                  <Text>{request.hospital_name}</Text>
+                  <Text fontSize="sm" color="gray.600">{request.hospital_address}</Text>
+                </VStack>
+              </HStack>
+              {request.description && (
+                <VStack align="stretch">
+                  <Text fontWeight="bold">Description:</Text>
+                  <Text>{request.description}</Text>
+                </VStack>
+              )}
+            </VStack>
+
+            <VStack align="stretch" spacing={4}>
+              <Heading size="md">Match Statistics</Heading>
+              <Divider />
+              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={4}>
+                <Stat
+                  px={4}
+                  py={3}
+                  bg={statBg}
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                >
+                  <Flex justifyContent="space-between">
+                    <Box>
+                      <StatLabel color="gray.600">Total Matches</StatLabel>
+                      <StatNumber fontSize="2xl" fontWeight="bold" color="brand.500">
+                        {matches.length}
+                      </StatNumber>
+                    </Box>
+                    <Flex
+                      w={10}
+                      h={10}
+                      align="center"
+                      justify="center"
+                      rounded="full"
+                      bg="brand.100"
+                      color="brand.500"
+                    >
+                      <Icon as={FaUsers} boxSize={4} />
+                    </Flex>
+                  </Flex>
+                </Stat>
+
+                <Stat
+                  px={4}
+                  py={3}
+                  bg={statBg}
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                >
+                  <Flex justifyContent="space-between">
+                    <Box>
+                      <StatLabel color="gray.600">Accepted</StatLabel>
+                      <StatNumber fontSize="2xl" fontWeight="bold" color="green.500">
+                        {acceptedMatches.length}
+                      </StatNumber>
+                    </Box>
+                    <Flex
+                      w={10}
+                      h={10}
+                      align="center"
+                      justify="center"
+                      rounded="full"
+                      bg="green.100"
+                      color="green.500"
+                    >
+                      <Icon as={FaCheckCircle} boxSize={4} />
+                    </Flex>
+                  </Flex>
+                </Stat>
+
+                <Stat
+                  px={4}
+                  py={3}
+                  bg={statBg}
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                >
+                  <Flex justifyContent="space-between">
+                    <Box>
+                      <StatLabel color="gray.600">Pending</StatLabel>
+                      <StatNumber fontSize="2xl" fontWeight="bold" color="yellow.500">
+                        {pendingMatches.length}
+                      </StatNumber>
+                    </Box>
+                    <Flex
+                      w={10}
+                      h={10}
+                      align="center"
+                      justify="center"
+                      rounded="full"
+                      bg="yellow.100"
+                      color="yellow.500"
+                    >
+                      <Icon as={FaHourglassHalf} boxSize={4} />
+                    </Flex>
+                  </Flex>
+                </Stat>
+
+                <Stat
+                  px={4}
+                  py={3}
+                  bg={statBg}
+                  borderRadius="md"
+                  borderWidth="1px"
+                  borderColor={borderColor}
+                >
+                  <Flex justifyContent="space-between">
+                    <Box>
+                      <StatLabel color="gray.600">Completed</StatLabel>
+                      <StatNumber fontSize="2xl" fontWeight="bold" color="blue.500">
+                        {completedMatches.length}
+                      </StatNumber>
+                      <StatHelpText fontSize="xs">
+                        {request.units_needed > 0 && 
+                          `${Math.round((completedMatches.length / request.units_needed) * 100)}% of needed units`
+                        }
+                      </StatHelpText>
+                    </Box>
+                    <Flex
+                      w={10}
+                      h={10}
+                      align="center"
+                      justify="center"
+                      rounded="full"
+                      bg="blue.100"
+                      color="blue.500"
+                    >
+                      <Icon as={FaCheckCircle} boxSize={4} />
+                    </Flex>
+                  </Flex>
+                </Stat>
+              </SimpleGrid>
+            </VStack>
+          </SimpleGrid>
+        </Box>
+
+        {/* Matches */}
+        <Box mt={4}>
+          <Tabs 
+            variant="soft-rounded" 
+            colorScheme="brand" 
+            index={tabIndex} 
+            onChange={setTabIndex}
+            mb={6}
+          >
+            <TabList mb={6}>
+              <Tab>All Matches ({matches.length})</Tab>
+              <Tab>Accepted ({acceptedMatches.length})</Tab>
+              <Tab>Pending ({pendingMatches.length})</Tab>
+              <Tab>Completed ({completedMatches.length})</Tab>
+              <Tab>Declined ({declinedMatches.length})</Tab>
+            </TabList>
+
+            <TabPanels>
+              <TabPanel px={0}>
+                <MatchList 
+                  matches={matches}
+                  isLoading={isLoading}
+                  error={error}
+                  onComplete={handleComplete}
+                  onCancel={handleCancel}
+                  isDonorView={false}
+                />
+              </TabPanel>
+              
+              <TabPanel px={0}>
+                {acceptedMatches.length === 0 ? (
+                  <Box 
+                    p={8} 
+                    textAlign="center" 
+                    borderRadius="lg" 
+                    bg={bgColor}
+                    borderWidth="1px"
+                    borderColor={borderColor}
+                  >
+                    <Heading size="md" mb={2} color="gray.600">No accepted matches</Heading>
+                    <Text color="gray.500">
+                      No donors have accepted your blood request yet.
+                    </Text>
+                  </Box>
+                ) : (
+                  <MatchList 
+                    matches={acceptedMatches}
+                    isLoading={isLoading}
+                    error={error}
+                    onComplete={handleComplete}
+                    onCancel={handleCancel}
+                    isDonorView={false}
+                    showFilters={false}
+                  />
+                )}
+              </TabPanel>
+              
+              <TabPanel px={0}>
+                {pendingMatches.length === 0 ? (
+                  <Box 
+                    p={8} 
+                    textAlign="center" 
+                    borderRadius="lg" 
+                    bg={bgColor}
+                    borderWidth="1px"
+                    borderColor={borderColor}
+                  >
+                    <Heading size="md" mb={2} color="gray.600">No pending matches</Heading>
+                    <Text color="gray.500">
+                      There are no donors waiting for a response.
+                    </Text>
+                  </Box>
+                ) : (
+                  <MatchList 
+                    matches={pendingMatches}
+                    isLoading={isLoading}
+                    error={error}
+                    isDonorView={false}
+                    showFilters={false}
+                  />
+                )}
+              </TabPanel>
+              
+              <TabPanel px={0}>
+                {completedMatches.length === 0 ? (
+                  <Box 
+                    p={8} 
+                    textAlign="center" 
+                    borderRadius="lg" 
+                    bg={bgColor}
+                    borderWidth="1px"
+                    borderColor={borderColor}
+                  >
+                    <Heading size="md" mb={2} color="gray.600">No completed donations</Heading>
+                    <Text color="gray.500">
+                      No donations have been completed for this request yet.
+                    </Text>
+                  </Box>
+                ) : (
+                  <MatchList 
+                    matches={completedMatches}
+                    isLoading={isLoading}
+                    error={error}
+                    isDonorView={false}
+                    showFilters={false}
+                  />
+                )}
+              </TabPanel>
+              
+              <TabPanel px={0}>
+                {declinedMatches.length === 0 ? (
+                  <Box 
+                    p={8} 
+                    textAlign="center" 
+                    borderRadius="lg" 
+                    bg={bgColor}
+                    borderWidth="1px"
+                    borderColor={borderColor}
+                  >
+                    <Heading size="md" mb={2} color="gray.600">No declined matches</Heading>
+                    <Text color="gray.500">
+                      No donors have declined your blood request.
+                    </Text>
+                  </Box>
+                ) : (
+                  <MatchList 
+                    matches={declinedMatches}
+                    isLoading={isLoading}
+                    error={error}
+                    isDonorView={false}
+                    showFilters={false}
+                  />
+                )}
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </Box>
       </VStack>
     </Container>
   );
-}; 
+};
+
+export default RequestMatchesPage; 

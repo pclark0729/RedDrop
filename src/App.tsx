@@ -1,69 +1,56 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, ProtectedRoute } from './features/auth';
-import SignInPage from './features/auth/pages/SignInPage';
-import SignUpPage from './features/auth/pages/SignUpPage';
-import ResetPasswordPage from './features/auth/pages/ResetPasswordPage';
-import DonorProfilePage from './features/donor/pages/DonorProfilePage';
-import DonorRegistrationPage from './features/donor/pages/DonorRegistrationPage';
-import { NotificationPage } from './features/notification';
-import Dashboard from './pages/Dashboard';
-import ProfilePage from './pages/ProfilePage';
-import LandingPage from './pages/LandingPage';
-import Header from './components/layout/Header';
-import Footer from './components/layout/Footer';
+import React, { ErrorInfo, ReactNode } from 'react';
+import { ChakraProvider } from '@chakra-ui/react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import theme from './app/theme';
+import { AuthProvider } from './features/auth/context/AuthContext';
+import AppRoutes from './routes';
 
-// Layout component to wrap routes with Header and Footer
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex flex-col min-h-screen">
-    <Header />
-    <main className="flex-grow">
-      {children}
-    </main>
-    <Footer />
-  </div>
-);
+// Error boundary component to catch rendering errors
+class ErrorBoundary extends React.Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-const App: React.FC = () => {
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Rendering error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "20px", color: "red" }}>
+          <h1>Something went wrong.</h1>
+          <details style={{ whiteSpace: "pre-wrap" }}>
+            {this.state.error && this.state.error.toString()}
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Layout>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
-            
-            {/* Auth routes */}
-            <Route path="/auth">
-              <Route path="signin" element={<SignInPage />} />
-              <Route path="signup" element={<SignUpPage />} />
-              <Route path="reset-password" element={<ResetPasswordPage />} />
-            </Route>
-            
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              
-              {/* Donor routes */}
-              <Route path="/donor">
-                <Route path="profile" element={<DonorProfilePage />} />
-                <Route path="register" element={<DonorRegistrationPage />} />
-              </Route>
-              
-              {/* Notification routes */}
-              <Route path="/notifications" element={<NotificationPage />} />
-              
-              {/* Add more protected routes here */}
-            </Route>
-            
-            {/* Fallback route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </AuthProvider>
+    <ErrorBoundary>
+      <ChakraProvider theme={theme}>
+        <Router>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </Router>
+      </ChakraProvider>
+    </ErrorBoundary>
   );
-};
+}
 
 export default App;

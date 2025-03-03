@@ -25,12 +25,21 @@ import {
   SimpleGrid,
   FormControl,
   FormLabel,
-  Stack
+  Stack,
+  InputGroup,
+  InputLeftElement,
+  Icon,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem
 } from '@chakra-ui/react';
 import { MatchCard } from './MatchCard';
 import { DonorMatch, MatchStatus, MatchFilters } from '../types';
 import { useMatching } from '../hooks/useMatching';
 import { format } from 'date-fns';
+import { FaSearch, FaFilter, FaChevronDown, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
+import { useColorModeValue } from '@chakra-ui/react';
 
 interface MatchListProps {
   initialFilters?: MatchFilters;
@@ -53,6 +62,10 @@ export const MatchList: React.FC<MatchListProps> = ({ initialFilters }) => {
   const [tabIndex, setTabIndex] = useState(0);
   const [cities, setCities] = useState<string[]>([]);
   const [states, setStates] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadMatches();
@@ -165,10 +178,73 @@ export const MatchList: React.FC<MatchListProps> = ({ initialFilters }) => {
     );
   };
 
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+
+  const filteredMatches = matches.filter(match => {
+    // Status filter
+    if (statusFilter !== 'all' && match.status !== statusFilter) {
+      return false;
+    }
+
+    // Search query
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const requesterName = `${match.requester_first_name} ${match.requester_last_name}`.toLowerCase();
+      const donorName = `${match.donor_first_name} ${match.donor_last_name}`.toLowerCase();
+      const hospital = match.request_hospital_name.toLowerCase();
+      const location = `${match.request_city} ${match.request_state}`.toLowerCase();
+
+      return (
+        requesterName.includes(searchLower) ||
+        donorName.includes(searchLower) ||
+        hospital.includes(searchLower) ||
+        location.includes(searchLower) ||
+        match.request_blood_type.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return true;
+  }).sort((a, b) => {
+    let valueA, valueB;
+
+    switch (sortBy) {
+      case 'created_at':
+        valueA = new Date(a.created_at).getTime();
+        valueB = new Date(b.created_at).getTime();
+        break;
+      case 'blood_type':
+        valueA = a.request_blood_type;
+        valueB = b.request_blood_type;
+        break;
+      case 'name':
+        valueA = `${a.requester_first_name} ${a.requester_last_name}`;
+        valueB = `${b.requester_first_name} ${b.requester_last_name}`;
+        break;
+      case 'location':
+        valueA = `${a.request_city}, ${a.request_state}`;
+        valueB = `${b.request_city}, ${b.request_state}`;
+        break;
+      default:
+        valueA = new Date(a.created_at).getTime();
+        valueB = new Date(b.created_at).getTime();
+    }
+
+    if (sortOrder === 'asc') {
+      return valueA > valueB ? 1 : -1;
+    } else {
+      return valueA < valueB ? 1 : -1;
+    }
+  });
+
+  const toggleSortOrder = () => {
+    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+  };
+
   return (
     <Box width="100%">
       <VStack spacing={6} align="stretch">
-        <Box bg="white" p={4} borderRadius="md" boxShadow="sm">
+        <Box bg={bgColor} p={4} borderRadius="md" boxShadow="sm" borderWidth="1px" borderColor={borderColor}>
           <Heading size="md" mb={4}>Filter Matches</Heading>
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
             <FormControl>
@@ -309,7 +385,7 @@ export const MatchList: React.FC<MatchListProps> = ({ initialFilters }) => {
               </Alert>
             ) : (
               <VStack spacing={4} align="stretch">
-                {getMatchesByTab().map(match => (
+                {filteredMatches.map(match => (
                   <MatchCard 
                     key={match.id} 
                     match={match} 

@@ -1,176 +1,291 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { NotificationBadge } from '../../features/notification';
-import { useAuth } from '../../features/auth';
+import React from 'react';
+import {
+  Box,
+  Flex,
+  HStack,
+  Button,
+  Text,
+  useColorModeValue,
+  Container,
+  IconButton,
+  useDisclosure,
+  Drawer,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  DrawerBody,
+  VStack,
+  Divider,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Avatar
+} from '@chakra-ui/react';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
+import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import { useAuthContext } from '../../features/auth/context/AuthContext';
 
-const Header: React.FC = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
+const NavLink = ({ to, children, isActive }: { to: string; children: React.ReactNode; isActive?: boolean }) => {
+  const activeBg = useColorModeValue('red.50', 'red.900');
+  const hoverBg = useColorModeValue('red.50', 'red.900');
+  const activeColor = useColorModeValue('red.600', 'red.200');
+  const color = useColorModeValue('gray.700', 'gray.200');
+  
+  return (
+    <Box
+      as={RouterLink}
+      to={to}
+      px={3}
+      py={2}
+      rounded="md"
+      position="relative"
+      fontWeight="medium"
+      color={isActive ? activeColor : color}
+      bg={isActive ? activeBg : 'transparent'}
+      _hover={{
+        bg: hoverBg,
+        color: activeColor,
+      }}
+      _after={isActive ? {
+        content: '""',
+        position: 'absolute',
+        bottom: '0',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '20px',
+        height: '2px',
+        bg: 'red.500',
+      } : {}}
+      transition="all 0.2s"
+    >
+      {children}
+    </Box>
+  );
+};
+
+const Header = () => {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut, isOnboarding } = useAuthContext();
+  
+  const bgColor = useColorModeValue('rgba(255, 255, 255, 0.8)', 'rgba(26, 32, 44, 0.8)');
+  const borderColor = useColorModeValue('red.100', 'red.900');
+  const logoColor = useColorModeValue('red.600', 'red.300');
+  
+  const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (!user) return '';
+    
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    } else if (user.first_name) {
+      return user.first_name;
+    } else {
+      // Extract username from email
+      return user.email.split('@')[0];
+    }
+  };
 
   return (
-    <header className="bg-white shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="flex items-center">
-                <span className="text-red-600 text-2xl font-bold">Red</span>
-                <span className="text-gray-900 text-2xl font-bold">Drop</span>
-              </Link>
-            </div>
-            <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <Link
-                to="/"
-                className="border-transparent text-gray-500 hover:border-red-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Home
-              </Link>
-              <Link
-                to="/donors"
-                className="border-transparent text-gray-500 hover:border-red-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Donors
-              </Link>
-              <Link
-                to="/camps"
-                className="border-transparent text-gray-500 hover:border-red-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Donation Camps
-              </Link>
-              <Link
-                to="/request"
-                className="border-transparent text-gray-500 hover:border-red-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Request Blood
-              </Link>
-            </nav>
-          </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            {isAuthenticated ? (
-              <>
-                <NotificationBadge className="mr-4" />
-                <div className="ml-3 relative">
-                  <div>
-                    <Link
-                      to="/profile"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    >
-                      My Profile
-                    </Link>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="ml-3 relative">
-                <div>
-                  <Link
-                    to="/login"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Login
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="-mr-2 flex items-center sm:hidden">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500"
-            >
-              <span className="sr-only">Open main menu</span>
-              {!isMenuOpen ? (
-                <svg
-                  className="block h-6 w-6"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="block h-6 w-6"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {isMenuOpen && (
-        <div className="sm:hidden">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
+    <Box
+      as="header"
+      position="sticky"
+      top="0"
+      zIndex="10"
+      bg={bgColor}
+      backdropFilter="blur(10px)"
+      borderBottom="1px"
+      borderColor={borderColor}
+      boxShadow="sm"
+    >
+      <Container maxW="container.xl" py={3}>
+        <Flex justify="space-between" align="center">
+          {/* Logo */}
+          <Flex align="center">
+            <Text
+              as={RouterLink}
               to="/"
-              className="bg-red-50 border-red-500 text-red-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              fontSize="2xl"
+              fontWeight="bold"
+              letterSpacing="tight"
+              bgGradient="linear(to-r, red.500, red.700)"
+              bgClip="text"
+              _hover={{
+                bgGradient: "linear(to-r, red.600, red.800)",
+              }}
             >
-              Home
-            </Link>
-            <Link
-              to="/donors"
-              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-            >
-              Donors
-            </Link>
-            <Link
-              to="/camps"
-              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-            >
-              Donation Camps
-            </Link>
-            <Link
-              to="/request"
-              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-            >
-              Request Blood
-            </Link>
-            {isAuthenticated ? (
+              RedDrop<Box as="span" color={logoColor} ml={1}>.</Box>
+            </Text>
+          </Flex>
+
+          {/* Desktop Navigation */}
+          <HStack spacing={4} display={{ base: 'none', md: 'flex' }}>
+            <NavLink to="/" isActive={isActive('/')}>Home</NavLink>
+            
+            {/* Conditional navigation based on authentication */}
+            {user ? (
               <>
-                <Link
-                  to="/notifications"
-                  className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-                >
-                  Notifications
-                </Link>
-                <Link
-                  to="/profile"
-                  className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-                >
-                  My Profile
-                </Link>
+                {!isOnboarding && (
+                  <NavLink to="/dashboard" isActive={isActive('/dashboard')}>Dashboard</NavLink>
+                )}
+                
+                <Menu>
+                  <MenuButton
+                    as={Button}
+                    variant="ghost"
+                    rightIcon={<ChevronDownIcon />}
+                    _hover={{ bg: 'red.50' }}
+                  >
+                    <Flex align="center">
+                      <Avatar 
+                        size="xs" 
+                        name={getUserDisplayName()} 
+                        mr={2} 
+                        bg="red.500"
+                        color="white"
+                      />
+                      <Text>{getUserDisplayName()}</Text>
+                    </Flex>
+                  </MenuButton>
+                  <MenuList>
+                    {isOnboarding ? (
+                      <MenuItem as={RouterLink} to="/onboarding">Complete Profile</MenuItem>
+                    ) : (
+                      <>
+                        <MenuItem as={RouterLink} to="/profile">Profile</MenuItem>
+                        <MenuItem as={RouterLink} to="/settings">Settings</MenuItem>
+                        <MenuItem as={RouterLink} to="/donations">My Donations</MenuItem>
+                      </>
+                    )}
+                    <Divider />
+                    <MenuItem onClick={handleSignOut} color="red.500">Sign Out</MenuItem>
+                  </MenuList>
+                </Menu>
               </>
             ) : (
-              <Link
-                to="/login"
-                className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
-              >
-                Login
-              </Link>
+              <>
+                <NavLink to="/signin" isActive={isActive('/signin')}>Sign In</NavLink>
+                <NavLink to="/signup" isActive={isActive('/signup')}>Sign Up</NavLink>
+                
+                <Button
+                  as={RouterLink}
+                  to="/donor/register"
+                  colorScheme="red"
+                  size="sm"
+                  ml={2}
+                  fontWeight="medium"
+                  _hover={{
+                    transform: 'translateY(-2px)',
+                    boxShadow: 'md',
+                  }}
+                  transition="all 0.2s"
+                >
+                  Become a Donor
+                </Button>
+              </>
             )}
-          </div>
-        </div>
-      )}
-    </header>
+          </HStack>
+
+          {/* Mobile Navigation Button */}
+          <IconButton
+            display={{ base: 'flex', md: 'none' }}
+            aria-label="Open menu"
+            icon={<HamburgerIcon />}
+            onClick={onOpen}
+            variant="ghost"
+            colorScheme="red"
+          />
+        </Flex>
+      </Container>
+
+      {/* Mobile Navigation Drawer */}
+      <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerBody pt={10}>
+            <VStack spacing={4} align="stretch">
+              <Text
+                fontSize="xl"
+                fontWeight="bold"
+                bgGradient="linear(to-r, red.500, red.700)"
+                bgClip="text"
+                mb={4}
+              >
+                RedDrop
+              </Text>
+              
+              {user && (
+                <Flex align="center" mb={2}>
+                  <Avatar 
+                    size="sm" 
+                    name={getUserDisplayName()} 
+                    mr={2} 
+                    bg="red.500"
+                    color="white"
+                  />
+                  <Text fontWeight="medium">{getUserDisplayName()}</Text>
+                </Flex>
+              )}
+              
+              <Divider />
+              <Box as={RouterLink} to="/" py={2} onClick={onClose}>Home</Box>
+              
+              {/* Conditional mobile navigation based on authentication */}
+              {user ? (
+                <>
+                  {!isOnboarding && (
+                    <Box as={RouterLink} to="/dashboard" py={2} onClick={onClose}>Dashboard</Box>
+                  )}
+                  
+                  {isOnboarding ? (
+                    <Box as={RouterLink} to="/onboarding" py={2} onClick={onClose}>Complete Profile</Box>
+                  ) : (
+                    <>
+                      <Box as={RouterLink} to="/profile" py={2} onClick={onClose}>Profile</Box>
+                      <Box as={RouterLink} to="/settings" py={2} onClick={onClose}>Settings</Box>
+                      <Box as={RouterLink} to="/donations" py={2} onClick={onClose}>My Donations</Box>
+                    </>
+                  )}
+                  
+                  <Divider />
+                  <Box py={2} onClick={() => { handleSignOut(); onClose(); }} color="red.500" cursor="pointer">
+                    Sign Out
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Box as={RouterLink} to="/signin" py={2} onClick={onClose}>Sign In</Box>
+                  <Box as={RouterLink} to="/signup" py={2} onClick={onClose}>Sign Up</Box>
+                  <Divider />
+                  <Button
+                    as={RouterLink}
+                    to="/donor/register"
+                    colorScheme="red"
+                    onClick={onClose}
+                  >
+                    Become a Donor
+                  </Button>
+                </>
+              )}
+            </VStack>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+    </Box>
   );
 };
 

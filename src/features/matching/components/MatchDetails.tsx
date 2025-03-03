@@ -33,7 +33,11 @@ import {
   StatLabel,
   StatNumber,
   StatHelpText,
-  Link
+  Link,
+  Flex,
+  Avatar,
+  useColorModeValue,
+  Tooltip
 } from '@chakra-ui/react';
 import { 
   FaMapMarkerAlt, 
@@ -47,7 +51,9 @@ import {
   FaClock,
   FaCheckCircle,
   FaTimesCircle,
-  FaArrowLeft
+  FaArrowLeft,
+  FaInfoCircle,
+  FaClipboardCheck
 } from 'react-icons/fa';
 import { format, formatDistance } from 'date-fns';
 import { DonorMatch, MatchStatus, MatchUpdateData } from '../types';
@@ -78,6 +84,10 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
   const [completionNotes, setCompletionNotes] = useState('');
   const [donationDate, setDonationDate] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const accentBg = useColorModeValue('brand.50', 'gray.700');
 
   React.useEffect(() => {
     loadMatchDetails();
@@ -241,7 +251,7 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
         </Button>
         
         <Box 
-          bg="white" 
+          bg={bgColor} 
           p={6} 
           borderRadius="lg" 
           boxShadow="md" 
@@ -407,21 +417,24 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
       
       {/* Decline Modal */}
       <Modal isOpen={isDeclineOpen} onClose={onDeclineClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Decline Donation Match</ModalHeader>
+        <ModalOverlay backdropFilter="blur(10px)" />
+        <ModalContent borderRadius="xl">
+          <ModalHeader borderBottomWidth="1px" borderColor="gray.100">
+            Decline Donation Match
+          </ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
+          <ModalBody py={6}>
             <FormControl>
               <FormLabel>Reason for declining (optional)</FormLabel>
               <Textarea 
                 value={declineReason} 
                 onChange={(e) => setDeclineReason(e.target.value)}
                 placeholder="Please provide a reason for declining this match"
+                borderRadius="md"
               />
             </FormControl>
           </ModalBody>
-          <ModalFooter>
+          <ModalFooter borderTopWidth="1px" borderColor="gray.100">
             <Button variant="ghost" mr={3} onClick={onDeclineClose}>
               Cancel
             </Button>
@@ -434,11 +447,13 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
       
       {/* Complete Modal */}
       <Modal isOpen={isCompleteOpen} onClose={onCompleteClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Mark Donation as Completed</ModalHeader>
+        <ModalOverlay backdropFilter="blur(10px)" />
+        <ModalContent borderRadius="xl">
+          <ModalHeader borderBottomWidth="1px" borderColor="gray.100">
+            Mark Donation as Completed
+          </ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
+          <ModalBody py={6}>
             <VStack spacing={4}>
               <FormControl>
                 <FormLabel>Donation Date</FormLabel>
@@ -446,6 +461,7 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
                   type="date" 
                   value={donationDate} 
                   onChange={(e) => setDonationDate(e.target.value)}
+                  borderRadius="md"
                 />
               </FormControl>
               <FormControl>
@@ -454,11 +470,12 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
                   value={completionNotes} 
                   onChange={(e) => setCompletionNotes(e.target.value)}
                   placeholder="Any additional information about the donation"
+                  borderRadius="md"
                 />
               </FormControl>
             </VStack>
           </ModalBody>
-          <ModalFooter>
+          <ModalFooter borderTopWidth="1px" borderColor="gray.100">
             <Button variant="ghost" mr={3} onClick={onCompleteClose}>
               Cancel
             </Button>
@@ -471,25 +488,28 @@ export const MatchDetails: React.FC<MatchDetailsProps> = ({ matchId, onBack }) =
       
       {/* Cancel Modal */}
       <Modal isOpen={isCancelOpen} onClose={onCancelClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Cancel Donation Match</ModalHeader>
+        <ModalOverlay backdropFilter="blur(10px)" />
+        <ModalContent borderRadius="xl">
+          <ModalHeader borderBottomWidth="1px" borderColor="gray.100">
+            Cancel Donation Match
+          </ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
+          <ModalBody py={6}>
             <FormControl>
               <FormLabel>Reason for cancellation (optional)</FormLabel>
               <Textarea 
                 value={cancelReason} 
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Please provide a reason for cancelling this match"
+                borderRadius="md"
               />
             </FormControl>
           </ModalBody>
-          <ModalFooter>
+          <ModalFooter borderTopWidth="1px" borderColor="gray.100">
             <Button variant="ghost" mr={3} onClick={onCancelClose}>
               Back
             </Button>
-            <Button colorScheme="gray" onClick={handleCancel}>
+            <Button colorScheme="red" onClick={handleCancel}>
               Cancel Match
             </Button>
           </ModalFooter>

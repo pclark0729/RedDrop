@@ -1,166 +1,388 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Container,
   Heading,
   Text,
-  VStack,
-  HStack,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Flex,
   Stat,
   StatLabel,
   StatNumber,
   StatHelpText,
   SimpleGrid,
   Icon,
-  Divider,
-  useDisclosure,
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  Button
+  useColorModeValue,
+  Button,
+  HStack,
+  useToast
 } from '@chakra-ui/react';
-import { FaCheckCircle, FaTimesCircle, FaClock, FaChartLine } from 'react-icons/fa';
-import { MatchList } from '../components/MatchList';
-import { MatchDetails } from '../components/MatchDetails';
+import { FaHandHoldingHeart, FaCheckCircle, FaTimesCircle, FaHourglassHalf } from 'react-icons/fa';
 import { useMatching } from '../hooks/useMatching';
+import MatchList from '../components/MatchList';
 import { MatchStatus } from '../types';
 
-export const DonorMatchesPage: React.FC = () => {
+const DonorMatchesPage: React.FC = () => {
   const { 
-    statistics, 
-    getMatchStatistics,
-    selectedMatch,
-    clearSelectedMatch
+    matches, 
+    stats, 
+    isLoading, 
+    error, 
+    fetchMatches, 
+    updateMatch, 
+    cancelMatch 
   } = useMatching();
-  
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [tabIndex, setTabIndex] = useState(0);
+  const toast = useToast();
 
-  React.useEffect(() => {
-    loadStatistics();
-  }, []);
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const statBg = useColorModeValue('brand.50', 'gray.700');
 
-  const loadStatistics = async () => {
-    await getMatchStatistics();
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
+
+  const handleAccept = async (matchId: string) => {
+    try {
+      await updateMatch(matchId, { status: MatchStatus.ACCEPTED });
+      toast({
+        title: 'Match accepted',
+        description: 'You have successfully accepted this donation match.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error accepting match',
+        description: 'There was a problem accepting this match. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
-  const handleViewMatchDetails = (matchId: string) => {
-    setSelectedMatchId(matchId);
-    onOpen();
+  const handleDecline = async (matchId: string, reason?: string) => {
+    try {
+      await updateMatch(matchId, { 
+        status: MatchStatus.DECLINED,
+        notes: reason || undefined
+      });
+      toast({
+        title: 'Match declined',
+        description: 'You have declined this donation match.',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error declining match',
+        description: 'There was a problem declining this match. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
 
-  const handleCloseDetails = () => {
-    clearSelectedMatch();
-    setSelectedMatchId(null);
-    onClose();
+  const handleComplete = async (matchId: string, notes?: string, donationDate?: string) => {
+    try {
+      await updateMatch(matchId, { 
+        status: MatchStatus.COMPLETED,
+        notes: notes || undefined,
+        donation_time: donationDate ? new Date(donationDate).toISOString() : new Date().toISOString()
+      });
+      toast({
+        title: 'Donation completed',
+        description: 'Thank you for your donation! You have helped save lives.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error completing donation',
+        description: 'There was a problem marking this donation as complete. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
   };
+
+  const handleCancel = async (matchId: string, reason?: string) => {
+    try {
+      await cancelMatch(matchId, reason);
+      toast({
+        title: 'Match cancelled',
+        description: 'You have cancelled this donation match.',
+        status: 'info',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: 'Error cancelling match',
+        description: 'There was a problem cancelling this match. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const pendingMatches = matches.filter(match => match.status === MatchStatus.PENDING);
+  const activeMatches = matches.filter(match => match.status === MatchStatus.ACCEPTED);
+  const completedMatches = matches.filter(match => 
+    match.status === MatchStatus.COMPLETED || 
+    match.status === MatchStatus.DECLINED || 
+    match.status === MatchStatus.CANCELLED
+  );
 
   return (
     <Container maxW="container.xl" py={8}>
-      <VStack spacing={8} align="stretch">
-        <Box>
-          <Heading size="xl" mb={2}>My Donation Matches</Heading>
-          <Text color="gray.600">
-            View and manage your blood donation matches
-          </Text>
-        </Box>
-        
-        {statistics && (
-          <Box bg="white" p={6} borderRadius="lg" boxShadow="md">
-            <Heading size="md" mb={4}>
-              <HStack>
-                <Icon as={FaChartLine} color="blue.500" />
-                <Text>Match Statistics</Text>
-              </HStack>
-            </Heading>
-            
-            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={6}>
-              <Stat>
-                <StatLabel>Total Matches</StatLabel>
-                <StatNumber>{statistics.totalMatches}</StatNumber>
-                <StatHelpText>All time</StatHelpText>
-              </Stat>
-              
-              <Stat>
-                <HStack>
-                  <Icon as={FaClock} color="yellow.500" />
-                  <StatLabel>Pending</StatLabel>
-                </HStack>
-                <StatNumber>{statistics.pendingMatches}</StatNumber>
-                <StatHelpText>Awaiting your response</StatHelpText>
-              </Stat>
-              
-              <Stat>
-                <HStack>
-                  <Icon as={FaCheckCircle} color="green.500" />
-                  <StatLabel>Completed</StatLabel>
-                </HStack>
-                <StatNumber>{statistics.completedMatches}</StatNumber>
-                <StatHelpText>Successful donations</StatHelpText>
-              </Stat>
-              
-              <Stat>
-                <HStack>
-                  <Icon as={FaTimesCircle} color="red.500" />
-                  <StatLabel>Declined/Cancelled</StatLabel>
-                </HStack>
-                <StatNumber>{statistics.declinedMatches + statistics.cancelledMatches}</StatNumber>
-                <StatHelpText>Not completed</StatHelpText>
-              </Stat>
-            </SimpleGrid>
-            
-            {statistics.averageResponseTimeMinutes > 0 && (
-              <Box mt={4} pt={4} borderTopWidth="1px" borderTopColor="gray.200">
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <Stat>
-                    <StatLabel>Average Response Time</StatLabel>
-                    <StatNumber>
-                      {Math.floor(statistics.averageResponseTimeMinutes / 60)} hours {Math.floor(statistics.averageResponseTimeMinutes % 60)} minutes
-                    </StatNumber>
-                    <StatHelpText>Time to accept or decline</StatHelpText>
-                  </Stat>
-                  
-                  <Stat>
-                    <StatLabel>Success Rate</StatLabel>
-                    <StatNumber>{Math.round(statistics.matchSuccessRate * 100)}%</StatNumber>
-                    <StatHelpText>Completed donations</StatHelpText>
-                  </Stat>
-                </SimpleGrid>
-              </Box>
-            )}
-          </Box>
-        )}
-        
-        <Divider />
-        
-        <MatchList />
-      </VStack>
-      
-      <Drawer
-        isOpen={isOpen}
-        placement="right"
-        onClose={handleCloseDetails}
-        size="lg"
+      <Box mb={8}>
+        <Heading 
+          as="h1" 
+          size="xl" 
+          mb={2}
+          bgGradient="linear(to-r, brand.500, brand.700)"
+          bgClip="text"
+        >
+          My Donation Matches
+        </Heading>
+        <Text color="gray.600">
+          View and manage your blood donation matches. Accept requests, track your donations, and help save lives.
+        </Text>
+      </Box>
+
+      {/* Stats Cards */}
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
+        <Stat
+          px={6}
+          py={4}
+          bg={statBg}
+          borderRadius="lg"
+          borderWidth="1px"
+          borderColor={borderColor}
+          boxShadow="sm"
+        >
+          <Flex justifyContent="space-between">
+            <Box>
+              <StatLabel color="gray.600">Pending Matches</StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="yellow.500">
+                {stats?.pending_count || pendingMatches.length}
+              </StatNumber>
+              <StatHelpText>Awaiting your response</StatHelpText>
+            </Box>
+            <Flex
+              w={12}
+              h={12}
+              align="center"
+              justify="center"
+              rounded="full"
+              bg="yellow.100"
+              color="yellow.500"
+            >
+              <Icon as={FaHourglassHalf} boxSize={5} />
+            </Flex>
+          </Flex>
+        </Stat>
+
+        <Stat
+          px={6}
+          py={4}
+          bg={statBg}
+          borderRadius="lg"
+          borderWidth="1px"
+          borderColor={borderColor}
+          boxShadow="sm"
+        >
+          <Flex justifyContent="space-between">
+            <Box>
+              <StatLabel color="gray.600">Active Donations</StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="green.500">
+                {stats?.active_count || activeMatches.length}
+              </StatNumber>
+              <StatHelpText>Accepted and in progress</StatHelpText>
+            </Box>
+            <Flex
+              w={12}
+              h={12}
+              align="center"
+              justify="center"
+              rounded="full"
+              bg="green.100"
+              color="green.500"
+            >
+              <Icon as={FaHandHoldingHeart} boxSize={5} />
+            </Flex>
+          </Flex>
+        </Stat>
+
+        <Stat
+          px={6}
+          py={4}
+          bg={statBg}
+          borderRadius="lg"
+          borderWidth="1px"
+          borderColor={borderColor}
+          boxShadow="sm"
+        >
+          <Flex justifyContent="space-between">
+            <Box>
+              <StatLabel color="gray.600">Completed Donations</StatLabel>
+              <StatNumber fontSize="3xl" fontWeight="bold" color="blue.500">
+                {stats?.completed_count || completedMatches.filter(m => m.status === MatchStatus.COMPLETED).length}
+              </StatNumber>
+              <StatHelpText>Lives you've helped save</StatHelpText>
+            </Box>
+            <Flex
+              w={12}
+              h={12}
+              align="center"
+              justify="center"
+              rounded="full"
+              bg="blue.100"
+              color="blue.500"
+            >
+              <Icon as={FaCheckCircle} boxSize={5} />
+            </Flex>
+          </Flex>
+        </Stat>
+      </SimpleGrid>
+
+      <Tabs 
+        variant="soft-rounded" 
+        colorScheme="brand" 
+        index={tabIndex} 
+        onChange={setTabIndex}
+        mb={6}
       >
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px">
-            Match Details
-          </DrawerHeader>
-          <DrawerBody p={4}>
-            {selectedMatchId && (
-              <MatchDetails 
-                matchId={selectedMatchId} 
-                onBack={handleCloseDetails} 
+        <TabList mb={6}>
+          <Tab>All Matches</Tab>
+          <Tab>Pending ({pendingMatches.length})</Tab>
+          <Tab>Active ({activeMatches.length})</Tab>
+          <Tab>History ({completedMatches.length})</Tab>
+        </TabList>
+
+        <TabPanels>
+          <TabPanel px={0}>
+            <MatchList 
+              matches={matches}
+              isLoading={isLoading}
+              error={error}
+              onAccept={handleAccept}
+              onDecline={handleDecline}
+              onComplete={handleComplete}
+              onCancel={handleCancel}
+              isDonorView={true}
+            />
+          </TabPanel>
+          
+          <TabPanel px={0}>
+            {pendingMatches.length === 0 ? (
+              <Box 
+                p={8} 
+                textAlign="center" 
+                borderRadius="lg" 
+                bg={bgColor}
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
+                <Heading size="md" mb={2} color="gray.600">No pending matches</Heading>
+                <Text color="gray.500" mb={6}>
+                  You don't have any pending blood donation matches at the moment.
+                </Text>
+                <Button colorScheme="brand" size="md">
+                  Find Donation Opportunities
+                </Button>
+              </Box>
+            ) : (
+              <MatchList 
+                matches={pendingMatches}
+                isLoading={isLoading}
+                error={error}
+                onAccept={handleAccept}
+                onDecline={handleDecline}
+                isDonorView={true}
+                showFilters={false}
               />
             )}
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
+          </TabPanel>
+          
+          <TabPanel px={0}>
+            {activeMatches.length === 0 ? (
+              <Box 
+                p={8} 
+                textAlign="center" 
+                borderRadius="lg" 
+                bg={bgColor}
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
+                <Heading size="md" mb={2} color="gray.600">No active donations</Heading>
+                <Text color="gray.500" mb={6}>
+                  You don't have any active blood donation matches at the moment.
+                </Text>
+                <HStack spacing={4} justify="center">
+                  <Button colorScheme="brand" size="md">
+                    Find Donation Opportunities
+                  </Button>
+                  <Button variant="outline" colorScheme="brand" size="md">
+                    View Pending Matches
+                  </Button>
+                </HStack>
+              </Box>
+            ) : (
+              <MatchList 
+                matches={activeMatches}
+                isLoading={isLoading}
+                error={error}
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+                isDonorView={true}
+                showFilters={false}
+              />
+            )}
+          </TabPanel>
+          
+          <TabPanel px={0}>
+            {completedMatches.length === 0 ? (
+              <Box 
+                p={8} 
+                textAlign="center" 
+                borderRadius="lg" 
+                bg={bgColor}
+                borderWidth="1px"
+                borderColor={borderColor}
+              >
+                <Heading size="md" mb={2} color="gray.600">No donation history</Heading>
+                <Text color="gray.500">
+                  You haven't completed any blood donations yet.
+                </Text>
+              </Box>
+            ) : (
+              <MatchList 
+                matches={completedMatches}
+                isLoading={isLoading}
+                error={error}
+                isDonorView={true}
+                showFilters={true}
+              />
+            )}
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Container>
   );
-}; 
+};
+
+export default DonorMatchesPage; 
