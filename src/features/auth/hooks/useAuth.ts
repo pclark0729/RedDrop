@@ -60,13 +60,31 @@ export const useAuth = () => {
 
   const signOut = useCallback(async () => {
     try {
+      console.log('useAuth: Starting sign out process');
       setIsLoading(true);
       setError(null);
-      await authService.signOut();
+      
+      const { error: signOutError } = await authService.signOut();
+      
+      if (signOutError) {
+        console.error('useAuth: Sign out service returned error:', signOutError);
+        throw signOutError;
+      }
+      
       setUser(null);
+      
+      console.log('useAuth: Sign out successful, redirecting to home page');
+      // Redirect to home page
+      window.location.href = '/';
     } catch (err) {
+      console.error('useAuth: Sign out error:', err);
       const error = err instanceof Error ? err : new Error('Failed to sign out');
       setError(error);
+      
+      // Still try to redirect even if there was an error
+      console.log('useAuth: Attempting to redirect despite error');
+      window.location.href = '/';
+      
       throw error;
     } finally {
       setIsLoading(false);

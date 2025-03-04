@@ -31,7 +31,8 @@ const SignInPage: React.FC = () => {
     e.preventDefault();
     
     try {
-      await signIn(credentials);
+      const user = await signIn(credentials);
+      console.log('Sign in successful, user:', user.id);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');

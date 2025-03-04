@@ -1,4 +1,4 @@
-import { supabase } from '../../../app/supabase';
+import supabase from '../../../app/supabase';
 import { 
   DonorMatch, 
   MatchStatus, 

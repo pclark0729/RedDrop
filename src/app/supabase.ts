@@ -12,10 +12,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// Create Supabase client
+// Create Supabase client with fallback values to prevent crashes
 const supabase = createClient<Database>(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
 );
 
 export default supabase; 

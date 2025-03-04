@@ -110,7 +110,8 @@ export const useAuthForm = ({
     
     setIsSubmitting(true);
     try {
-      await signIn(formState.email, formState.password);
+      const user = await signIn(formState.email, formState.password);
+      console.log('Sign in successful via form hook, user:', user.id);
       onSuccess?.();
     } catch (error) {
       console.error('Sign in error:', error);

@@ -92,12 +92,38 @@ class AuthService {
    */
   async signOut(): Promise<AuthResponse> {
     try {
+      console.log('AuthService: Signing out user');
+      
+      // Clear any session storage
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          // Clear auth-related items
+          sessionStorage.removeItem('auth_success');
+          sessionStorage.removeItem('auth_complete');
+          sessionStorage.removeItem('profile_fetch_pending');
+          sessionStorage.removeItem('profile_fetch_error');
+          sessionStorage.removeItem('needs_onboarding');
+          sessionStorage.removeItem('rls_policy_error');
+          sessionStorage.removeItem('user_email');
+          console.log('AuthService: Cleared session storage');
+        }
+      } catch (storageError) {
+        console.warn('AuthService: Failed to clear session storage:', storageError);
+      }
+      
+      // Sign out with Supabase
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('AuthService: Supabase sign out error:', error);
+        throw error;
+      }
+      
+      console.log('AuthService: Successfully signed out');
       return { error: null };
     } catch (error) {
-      console.error('Error signing out:', error);
-      return { error: error instanceof Error ? error : new Error('An unknown error occurred') };
+      console.error('AuthService: Error signing out:', error);
+      return { error: error instanceof Error ? error : new Error('An unknown error occurred during sign out') };
     }
   }
 

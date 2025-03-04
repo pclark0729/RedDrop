@@ -48,17 +48,8 @@ import Dashboard from '../features/dashboard/components/Dashboard';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, isOnboarding } = useAuthContext();
+  const { user, isLoading } = useAuthContext();
   const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    // If user is authenticated but needs to complete onboarding,
-    // redirect to onboarding page unless they're already there
-    if (user && isOnboarding && location.pathname !== '/onboarding') {
-      navigate('/onboarding', { replace: true });
-    }
-  }, [user, isOnboarding, location.pathname, navigate]);
 
   if (isLoading) {
     return (
@@ -69,11 +60,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
+    console.log('ProtectedRoute: No user found, redirecting to sign-in page');
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
-  // If user is authenticated and has completed onboarding (or is on the onboarding page),
-  // render the protected content
+  // If user is authenticated, render the protected content
   return <>{children}</>;
 };
 
@@ -81,31 +72,77 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, isOnboarding } = useAuthContext();
   const location = useLocation();
-  const navigate = useNavigate();
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
+  // Add a safety timeout to prevent infinite loading
   useEffect(() => {
-    // If user is authenticated but has already completed onboarding,
-    // redirect to dashboard
-    if (user && !isOnboarding) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [user, isOnboarding, navigate]);
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.log('OnboardingRoute: Loading timeout occurred, rendering content anyway');
+        setTimeoutOccurred(true);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
-  if (isLoading) {
+  // If loading and timeout hasn't occurred yet, show spinner
+  if (isLoading && !timeoutOccurred) {
     return (
       <Center h="100vh">
-        <Spinner size="xl" color="red.500" />
+        <VStack spacing={4}>
+          <Spinner size="xl" color="red.500" />
+          <Text>Loading your profile...</Text>
+        </VStack>
       </Center>
     );
   }
 
-  if (!user) {
+  // Check if we have a forced access flag in session storage
+  const forcedAccess = sessionStorage.getItem('force_onboarding_access') === 'true';
+  
+  // If no user but we have forced access, render the content anyway
+  if (!user && forcedAccess) {
+    console.log('OnboardingRoute: No user but forced access is enabled, rendering content');
+    return <>{children}</>;
+  }
+  
+  // If no user and no forced access, redirect to sign-in
+  if (!user && !forcedAccess) {
+    console.log('OnboardingRoute: No user found, redirecting to sign-in page');
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
-  // If user is authenticated and needs to complete onboarding,
-  // render the onboarding content
+  // If user exists but doesn't need onboarding and no forced access, redirect to dashboard
+  if (user && !isOnboarding && !forcedAccess) {
+    console.log('OnboardingRoute: User already completed onboarding, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Otherwise, render the onboarding content
   return <>{children}</>;
+};
+
+// Direct Onboarding Access Component - a special route that bypasses auth checks
+const DirectOnboardingAccess = () => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    console.log('Setting forced onboarding access flag and redirecting');
+    // Set a flag in session storage to indicate forced access
+    sessionStorage.setItem('force_onboarding_access', 'true');
+    // Navigate to the actual onboarding page
+    navigate('/onboarding', { replace: true });
+  }, [navigate]);
+  
+  return (
+    <Center h="100vh">
+      <VStack spacing={4}>
+        <Spinner size="xl" color="red.500" />
+        <Text>Preparing onboarding page...</Text>
+      </VStack>
+    </Center>
+  );
 };
 
 // Cyberpunk-inspired button component
@@ -208,7 +245,7 @@ const LandingPage = () => {
   };
   
   return (
-    <Layout>
+    <>
       {/* Hero Section */}
       <Container maxW="container.xl" pt={{ base: 10, md: 20 }} pb={{ base: 16, md: 28 }}>
         <Grid templateColumns={{ base: '1fr', lg: '1fr 1fr' }} gap={10} alignItems="center">
@@ -311,85 +348,152 @@ const LandingPage = () => {
           </SimpleGrid>
         </Container>
       </Box>
-    </Layout>
+    </>
   );
+};
+
+// Session storage helpers
+const sessionHelpers = {
+  // Getters
+  getAuthSuccess: () => sessionStorage.getItem('auth_success') === 'true',
+  getSignInComplete: () => sessionStorage.getItem('sign_in_complete') === 'true',
+  getNeedsOnboarding: () => sessionStorage.getItem('needs_onboarding') === 'true',
+  getRlsPolicyError: () => sessionStorage.getItem('rls_policy_error') === 'true',
+  
+  // Clear functions
+  clearAuthSuccess: () => {
+    sessionStorage.removeItem('auth_success');
+    sessionStorage.removeItem('sign_in_complete');
+  }
 };
 
 // Sign In Page
 const SignInPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, isOnboarding } = useAuthContext();
+  const { signIn } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState({
-    email: '',
-    password: ''
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   
-  // Get the redirect path from location state, or default to dashboard
-  const from = location.state?.from?.pathname || '/dashboard';
+  // Check for stored auth status on component mount
+  useEffect(() => {
+    const checkStoredAuthStatus = () => {
+      const signInComplete = sessionHelpers.getSignInComplete();
+      const authSuccess = sessionHelpers.getAuthSuccess();
+      const needsOnboarding = sessionHelpers.getNeedsOnboarding();
+      const hasRlsError = sessionHelpers.getRlsPolicyError();
+      
+      console.log('Checking stored auth status:', { 
+        signInComplete, 
+        authSuccess, 
+        needsOnboarding,
+        hasRlsError
+      });
+      
+      if (signInComplete && authSuccess) {
+        console.log('Found stored auth success, attempting navigation');
+        
+        // Clear the flags
+        sessionHelpers.clearAuthSuccess();
+        
+        // Navigate based on onboarding status
+        if (needsOnboarding) {
+          console.log('User needs onboarding based on session storage, navigating');
+          navigate('/onboarding');
+        } else {
+          console.log('User authenticated based on session storage, navigating');
+          navigate('/dashboard');
+        }
+      }
+      
+      // Show a warning if RLS policy error was detected
+      if (hasRlsError) {
+        setError('Database policy error detected. Some features may be limited. Please complete your profile to continue.');
+      }
+    };
+    
+    // Run the check with a small delay to ensure all session storage is set
+    const timer = setTimeout(checkStoredAuthStatus, 100);
+    return () => clearTimeout(timer);
+  }, [navigate]);
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCredentials(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  const handleSignIn = async () => {
-    // Validate form
-    if (!credentials.email || !credentials.password) {
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate inputs
+    if (!email || !password) {
       setError('Email and password are required');
       return;
     }
     
     try {
+      // Start loading
       setIsLoading(true);
       setError(null);
       
-      // Sign in with Supabase
-      await signIn({ 
-        email: credentials.email, 
-        password: credentials.password 
-      });
+      console.log('Attempting to sign in with:', { email });
       
-      // Navigate to onboarding if needed, otherwise to the intended destination
-      if (isOnboarding) {
-        navigate('/onboarding');
-      } else {
-        navigate(from, { replace: true });
-      }
+      // Call the sign in function
+      const user = await signIn({ email, password });
+      
+      console.log('Sign-in authentication successful, user:', user.id);
+      
+      // Reset loading state immediately
+      setIsLoading(false);
+      
+      // Navigate to dashboard immediately after successful authentication
+      // Profile loading will happen in the background
+      navigate('/dashboard');
     } catch (err) {
-      console.error('Authentication error:', err);
+      console.error('Sign-in error:', err);
       setError('Invalid email or password. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
   
-  const handleSignUp = () => {
+  // Navigate to sign up page
+  const handleSignUpClick = () => {
     navigate('/signup');
   };
   
+  // Add a safety timeout to reset loading state if it gets stuck
+  useEffect(() => {
+    let loadingTimer: NodeJS.Timeout | null = null;
+    
+    if (isLoading) {
+      // Reset loading state after 10 seconds as a safety measure
+      loadingTimer = setTimeout(() => {
+        console.log('Loading timeout triggered - resetting loading state');
+        setIsLoading(false);
+      }, 10000);
+    }
+    
+    return () => {
+      if (loadingTimer) clearTimeout(loadingTimer);
+    };
+  }, [isLoading]);
+  
   return (
     <Container maxW="md" py={12}>
-      <VStack spacing={8} align="stretch">
+      <VStack spacing={6} align="stretch">
+        {/* Header */}
         <VStack spacing={2} align="center">
           <Heading 
             size="xl" 
-            textAlign="center"
             bgGradient="linear(to-r, red.500, red.700)"
             bgClip="text"
           >
             Welcome Back
           </Heading>
-          <Text color="gray.500" textAlign="center">
+          <Text color="gray.500">
             Sign in to continue to your account
           </Text>
         </VStack>
         
+        {/* Error message */}
         {error && (
           <Alert status="error" borderRadius="md">
             <AlertIcon />
@@ -397,51 +501,59 @@ const SignInPage = () => {
           </Alert>
         )}
         
-        <VStack spacing={4} align="stretch">
-          <FormControl isRequired>
-            <FormLabel>Email</FormLabel>
-            <Input 
-              name="email"
-              type="email"
-              value={credentials.email}
-              onChange={handleChange}
-              placeholder="Your email address"
-            />
-          </FormControl>
-          
-          <FormControl isRequired>
-            <FormLabel>Password</FormLabel>
-            <InputGroup>
+        {/* Sign in form */}
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4}>
+            <FormControl isRequired>
+              <FormLabel>Email</FormLabel>
               <Input 
-                name="password"
-                type="password"
-                value={credentials.password}
-                onChange={handleChange}
-                placeholder="Your password"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Your email address"
+                disabled={isLoading}
               />
-            </InputGroup>
-          </FormControl>
-          
-          <Button
-            colorScheme="red"
-            size="lg"
-            onClick={handleSignIn}
-            isLoading={isLoading}
-            loadingText="Signing In"
-            mt={2}
-          >
-            Sign In
-          </Button>
-          
-          <Divider />
-          
-          <Text textAlign="center">
-            Don't have an account?{' '}
-            <Button variant="link" colorScheme="red" onClick={handleSignUp}>
-              Sign Up
+            </FormControl>
+            
+            <FormControl isRequired>
+              <FormLabel>Password</FormLabel>
+              <Input 
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password"
+                disabled={isLoading}
+              />
+            </FormControl>
+            
+            <Button
+              type="submit"
+              colorScheme="red"
+              size="lg"
+              width="100%"
+              isLoading={isLoading}
+              loadingText="Signing In"
+              mt={2}
+            >
+              Sign In
             </Button>
+          </VStack>
+        </form>
+        
+        {/* Sign up link */}
+        <Text textAlign="center" mt={4}>
+          Don't have an account?{' '}
+          <Text
+            as="span"
+            color="red.500"
+            fontWeight="medium"
+            cursor="pointer"
+            _hover={{ textDecoration: 'underline' }}
+            onClick={handleSignUpClick}
+          >
+            Sign Up
           </Text>
-        </VStack>
+        </Text>
       </VStack>
     </Container>
   );
@@ -461,18 +573,26 @@ const SignUpPage = () => {
     confirmPassword: ''
   });
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
   
   const handleCreateAccount = async () => {
-    // Validate form
-    if (!formData.email || !formData.password) {
-      setError('Email and password are required');
+    // Validate form data
+    if (!formData.email || !formData.password || !formData.confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+    
+    if (!validateEmail(formData.email)) {
+      setError('Please enter a valid email address');
       return;
     }
     
@@ -502,7 +622,21 @@ const SignUpPage = () => {
       navigate('/onboarding');
     } catch (err) {
       console.error('Registration error:', err);
-      setError('Failed to create account. Please try again.');
+      
+      // Display more specific error messages
+      if (err instanceof Error) {
+        if (err.message.includes('Database error')) {
+          setError('Database error creating user profile. Please try again or contact support.');
+        } else if (err.message.includes('User already registered')) {
+          setError('This email is already registered. Please sign in instead.');
+        } else if (err.message.includes('Password')) {
+          setError('Password error: ' + err.message);
+        } else {
+          setError(err.message || 'Failed to create account. Please try again.');
+        }
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -543,7 +677,7 @@ const SignUpPage = () => {
               <Input 
                 name="firstName"
                 value={formData.firstName}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="First name"
               />
             </FormControl>
@@ -553,7 +687,7 @@ const SignUpPage = () => {
               <Input 
                 name="lastName"
                 value={formData.lastName}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Last name"
               />
             </FormControl>
@@ -565,7 +699,7 @@ const SignUpPage = () => {
               name="email"
               type="email"
               value={formData.email}
-              onChange={handleChange}
+              onChange={handleInputChange}
               placeholder="Your email address"
             />
           </FormControl>
@@ -577,7 +711,7 @@ const SignUpPage = () => {
                 name="password"
                 type="password"
                 value={formData.password}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Create a password"
               />
             </InputGroup>
@@ -590,7 +724,7 @@ const SignUpPage = () => {
                 name="confirmPassword"
                 type="password"
                 value={formData.confirmPassword}
-                onChange={handleChange}
+                onChange={handleInputChange}
                 placeholder="Confirm your password"
               />
             </InputGroup>
@@ -621,6 +755,43 @@ const SignUpPage = () => {
   );
 };
 
+// Force navigation to a specific route with fallback mechanisms
+const handleForceNavigation = (path: string, navigateFunc?: NavigateFunction) => {
+  console.log(`Forcing navigation to ${path} with fallback mechanisms`);
+  
+  // Store the path in session storage first as a fallback
+  sessionStorage.setItem('redirectPath', path);
+  
+  // For onboarding, set the forced access flag
+  if (path === '/onboarding') {
+    sessionStorage.setItem('force_onboarding_access', 'true');
+  }
+  
+  // Try multiple navigation methods
+  try {
+    // Method 1: Use React Router's navigate if available
+    if (navigateFunc) {
+      console.log('Using React Router navigate');
+      navigateFunc(path);
+      return;
+    }
+    
+    // Method 2: Direct location change as fallback
+    console.log('Falling back to direct location change');
+    window.location.href = path;
+  } catch (err) {
+    console.error('Navigation failed, trying alternative:', err);
+    
+    // Method 3: Use the direct access route for onboarding
+    if (path === '/onboarding') {
+      window.location.href = '/direct-onboarding';
+    } else {
+      // For other paths, try to reload
+      window.location.reload();
+    }
+  }
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -628,6 +799,9 @@ const AppRoutes = () => {
       <Route path="/" element={<Layout><LandingPage /></Layout>} />
       <Route path="/signin" element={<Layout><SignInPage /></Layout>} />
       <Route path="/signup" element={<Layout><SignUpPage /></Layout>} />
+      
+      {/* Direct Access Route - bypasses auth checks */}
+      <Route path="/direct-onboarding" element={<DirectOnboardingAccess />} />
       
       {/* Onboarding Route */}
       <Route 

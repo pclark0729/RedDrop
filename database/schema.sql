@@ -2,6 +2,15 @@
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "postgis"; -- For geospatial functionality
+CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For text search
+
+-- Set up custom types
+CREATE TYPE blood_type AS ENUM ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-');
+CREATE TYPE urgency_level AS ENUM ('Normal', 'Urgent', 'Critical');
+CREATE TYPE request_status AS ENUM ('Pending', 'Matching', 'Fulfilled', 'Cancelled');
+CREATE TYPE donation_status AS ENUM ('Scheduled', 'Completed', 'Cancelled');
+CREATE TYPE notification_type AS ENUM ('Request', 'Match', 'Camp', 'System');
 
 -- Profiles table (extends Supabase auth.users)
 CREATE TABLE profiles (
@@ -37,6 +46,21 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- Update timestamp function
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for updated_at timestamps
+CREATE TRIGGER set_timestamp_profiles
+BEFORE UPDATE ON profiles
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
 -- Blood Drives table
 CREATE TABLE blood_drives (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -52,6 +76,11 @@ CREATE TABLE blood_drives (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TRIGGER set_timestamp_blood_drives
+BEFORE UPDATE ON blood_drives
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
 -- Donations table
 CREATE TABLE donations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -66,6 +95,11 @@ CREATE TABLE donations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TRIGGER set_timestamp_donations
+BEFORE UPDATE ON donations
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
 
 -- Blood Requests table
 CREATE TABLE blood_requests (
@@ -83,6 +117,11 @@ CREATE TABLE blood_requests (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TRIGGER set_timestamp_blood_requests
+BEFORE UPDATE ON blood_requests
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
 -- Donation Appointments table
 CREATE TABLE donation_appointments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -95,6 +134,11 @@ CREATE TABLE donation_appointments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TRIGGER set_timestamp_donation_appointments
+BEFORE UPDATE ON donation_appointments
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
 -- Matches table (connects donations to requests)
 CREATE TABLE matches (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -105,6 +149,11 @@ CREATE TABLE matches (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TRIGGER set_timestamp_matches
+BEFORE UPDATE ON matches
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
 
 -- Notifications table
 CREATE TABLE notifications (

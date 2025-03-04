@@ -24,17 +24,45 @@ import {
   Alert,
   AlertIcon,
   Avatar,
+  Center,
 } from '@chakra-ui/react';
 import { FaCalendarAlt, FaHeart, FaMapMarkerAlt, FaUserFriends } from 'react-icons/fa';
 import { useAuthContext } from '../../auth/context/AuthContext';
-import { getUserDonations, getUserAppointments, getUpcomingBloodDrives } from '../../../lib/supabase';
+import supabase from '../../../app/supabase';
 import { DonationWithBloodDrive, AppointmentWithBloodDrive, BloodDrive } from '../../../lib/database.types';
+import { useNavigate } from 'react-router-dom';
+
+// Safe storage utility
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        return window.sessionStorage.getItem(key);
+      }
+    } catch (error) {
+      console.warn(`Failed to get sessionStorage item "${key}":`, error);
+    }
+    return null;
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn(`Failed to remove sessionStorage item "${key}":`, error);
+    }
+  }
+};
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuthContext();
+  const { user, isLoading: authLoading, isOnboarding } = useAuthContext();
+  const navigate = useNavigate();
   const [donations, setDonations] = useState<DonationWithBloodDrive[]>([]);
   const [appointments, setAppointments] = useState<AppointmentWithBloodDrive[]>([]);
   const [bloodDrives, setBloodDrives] = useState<BloodDrive[]>([]);
+  const [checkingProfile, setCheckingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -43,22 +71,123 @@ const Dashboard: React.FC = () => {
   const statBg = useColorModeValue('red.50', 'red.900');
   
   useEffect(() => {
+    const checkOnboardingStatus = () => {
+      // If profile fetch is still pending, wait a bit
+      const profileFetchPending = safeStorage.getItem('profile_fetch_pending') === 'true';
+      const profileFetchError = safeStorage.getItem('profile_fetch_error');
+      const hasRlsError = safeStorage.getItem('rls_policy_error') === 'true';
+      const rlsErrorDetails = safeStorage.getItem('rls_error_details');
+      
+      if (profileFetchPending) {
+        console.log('Dashboard: Profile fetch is still pending, waiting...');
+        // Check again in 1 second
+        setTimeout(checkOnboardingStatus, 1000);
+        return;
+      }
+      
+      setCheckingProfile(false);
+      
+      // Check if there was an RLS error
+      if (hasRlsError && rlsErrorDetails) {
+        try {
+          const errorInfo = JSON.parse(rlsErrorDetails);
+          console.error('Dashboard: RLS Policy Error:', errorInfo);
+          setProfileError(`${errorInfo.title}: ${errorInfo.message}\n\nTechnical details: ${errorInfo.technical} (Code: ${errorInfo.code})`);
+          return;
+        } catch (e) {
+          console.error('Error parsing RLS error details:', e);
+        }
+      }
+      
+      // Check if there was an error fetching the profile
+      if (profileFetchError) {
+        console.error('Dashboard: Error fetching profile:', profileFetchError);
+        try {
+          const errorObj = JSON.parse(profileFetchError);
+          setProfileError(`Error fetching profile: ${errorObj.message || profileFetchError}`);
+        } catch (e) {
+          setProfileError(`Error fetching profile: ${profileFetchError}`);
+        }
+        // Clear the error so we don't keep showing it
+        safeStorage.removeItem('profile_fetch_error');
+        return;
+      }
+      
+      // Check if user needs onboarding
+      const needsOnboarding = safeStorage.getItem('needs_onboarding') === 'true';
+      
+      console.log('Dashboard: Checking if user needs onboarding:', { 
+        needsOnboarding, 
+        isOnboarding, 
+        hasRlsError,
+        user: user ? { id: user.id, email: user.email } : 'No user'
+      });
+      
+      if (needsOnboarding || isOnboarding) {
+        console.log('Dashboard: User needs onboarding, redirecting...');
+        navigate('/onboarding');
+      }
+    };
+    
+    // Start checking after a short delay to allow auth context to update
+    const timer = setTimeout(checkOnboardingStatus, 500);
+    return () => clearTimeout(timer);
+  }, [navigate, isOnboarding, user]);
+  
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        if (checkingProfile) {
+          // Don't fetch data until we've confirmed the profile status
+          return;
+        }
         
         if (user) {
           // Fetch user's donation history
-          const donationsData = await getUserDonations(user.id);
+          const { data: donationsData, error: donationsError } = await supabase
+            .from('donations')
+            .select(`
+              *,
+              blood_drive:blood_drive_id (name, location)
+            `)
+            .eq('donor_id', user.id)
+            .order('donation_date', { ascending: false });
+            
+          if (donationsError) {
+            console.error('Error fetching user donations:', donationsError);
+            throw donationsError;
+          }
           setDonations(donationsData as DonationWithBloodDrive[]);
           
           // Fetch user's upcoming appointments
-          const appointmentsData = await getUserAppointments(user.id);
+          const { data: appointmentsData, error: appointmentsError } = await supabase
+            .from('donation_appointments')
+            .select(`
+              *,
+              blood_drive:blood_drive_id (name, location, drive_date)
+            `)
+            .eq('donor_id', user.id)
+            .gte('appointment_date', new Date().toISOString())
+            .order('appointment_date', { ascending: true });
+            
+          if (appointmentsError) {
+            console.error('Error fetching user appointments:', appointmentsError);
+            throw appointmentsError;
+          }
           setAppointments(appointmentsData as AppointmentWithBloodDrive[]);
           
           // Fetch upcoming blood drives
-          const drivesData = await getUpcomingBloodDrives(5);
+          const { data: drivesData, error: drivesError } = await supabase
+            .from('blood_drives')
+            .select('*')
+            .gte('drive_date', new Date().toISOString())
+            .order('drive_date', { ascending: true })
+            .limit(5);
+            
+          if (drivesError) {
+            console.error('Error fetching upcoming blood drives:', drivesError);
+            throw drivesError;
+          }
           setBloodDrives(drivesData);
         }
       } catch (err) {
@@ -98,15 +227,83 @@ const Dashboard: React.FC = () => {
     ? formatDate(appointments[0].appointment_date)
     : 'No upcoming appointments';
   
-  if (isLoading) {
+  if (authLoading || isLoading || checkingProfile) {
     return (
       <Container maxW="container.xl" py={8}>
         <Flex justify="center" align="center" minH="60vh">
           <VStack spacing={4}>
             <Spinner size="xl" color="red.500" thickness="4px" />
             <Text>Loading your dashboard...</Text>
+            {checkingProfile && (
+              <Text fontSize="sm" color="gray.500">Verifying profile information...</Text>
+            )}
           </VStack>
         </Flex>
+      </Container>
+    );
+  }
+  
+  if (profileError) {
+    const isRlsError = profileError.includes('infinite recursion detected in policy');
+    
+    return (
+      <Container maxW="container.xl" py={8}>
+        <Alert 
+          status="error" 
+          mb={6} 
+          borderRadius="md" 
+          flexDirection="column" 
+          alignItems="flex-start"
+        >
+          <Flex w="100%" mb={2}>
+            <AlertIcon />
+            <Box flex="1">
+              <Text fontWeight="bold">Error loading your profile</Text>
+              <Text whiteSpace="pre-wrap">{profileError}</Text>
+            </Box>
+          </Flex>
+          
+          {isRlsError && (
+            <Box mt={4} p={4} bg="gray.50" borderRadius="md" w="100%">
+              <Text fontWeight="bold" mb={2}>For Administrators:</Text>
+              <Text mb={2}>This error is caused by an infinite recursion in the Row Level Security (RLS) policy for the profiles table.</Text>
+              <Text mb={2}>To fix this issue:</Text>
+              <VStack align="start" pl={4} spacing={1}>
+                <Text>1. Go to your Supabase dashboard</Text>
+                <Text>2. Open the SQL Editor</Text>
+                <Text>3. Run the SQL script from the "fix_rls_policy.sql" file</Text>
+                <Text>4. The script will fix the RLS policies to prevent recursion</Text>
+              </VStack>
+            </Box>
+          )}
+        </Alert>
+        
+        <Center>
+          <HStack spacing={4}>
+            <Button 
+              colorScheme="red" 
+              onClick={() => {
+                // Clear error state
+                setProfileError(null);
+                // Clear session storage
+                safeStorage.removeItem('profile_fetch_error');
+                safeStorage.removeItem('rls_error_details');
+                // Reload the page to retry
+                window.location.reload();
+              }}
+            >
+              Retry
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              colorScheme="blue" 
+              onClick={() => navigate('/onboarding')}
+            >
+              Go to Onboarding
+            </Button>
+          </HStack>
+        </Center>
       </Container>
     );
   }

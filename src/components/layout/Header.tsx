@@ -78,10 +78,19 @@ const Header = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log('Header: Initiating sign out process');
+      
+      // Show loading state if needed
+      // You could add a loading state here if you want to show a loading indicator
+      
       await signOut();
-      navigate('/');
+      // No need to navigate here as the AuthContext signOut function already redirects
+      console.log('Header: Sign out function called successfully');
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Header: Sign out error:', error);
+      // If there's an error during sign out, try to navigate to home page as a fallback
+      console.log('Header: Attempting fallback navigation to home page');
+      navigate('/');
     }
   };
 
@@ -139,7 +148,10 @@ const Header = () => {
             {user ? (
               <>
                 {!isOnboarding && (
-                  <NavLink to="/dashboard" isActive={isActive('/dashboard')}>Dashboard</NavLink>
+                  <>
+                    <NavLink to="/dashboard" isActive={isActive('/dashboard')}>Dashboard</NavLink>
+                    <NavLink to="/donations" isActive={isActive('/donations')}>My Donations</NavLink>
+                  </>
                 )}
                 
                 <Menu>
@@ -167,7 +179,6 @@ const Header = () => {
                       <>
                         <MenuItem as={RouterLink} to="/profile">Profile</MenuItem>
                         <MenuItem as={RouterLink} to="/settings">Settings</MenuItem>
-                        <MenuItem as={RouterLink} to="/donations">My Donations</MenuItem>
                       </>
                     )}
                     <Divider />
@@ -248,7 +259,10 @@ const Header = () => {
               {user ? (
                 <>
                   {!isOnboarding && (
-                    <Box as={RouterLink} to="/dashboard" py={2} onClick={onClose}>Dashboard</Box>
+                    <>
+                      <Box as={RouterLink} to="/dashboard" py={2} onClick={onClose}>Dashboard</Box>
+                      <Box as={RouterLink} to="/donations" py={2} onClick={onClose}>My Donations</Box>
+                    </>
                   )}
                   
                   {isOnboarding ? (
@@ -257,7 +271,6 @@ const Header = () => {
                     <>
                       <Box as={RouterLink} to="/profile" py={2} onClick={onClose}>Profile</Box>
                       <Box as={RouterLink} to="/settings" py={2} onClick={onClose}>Settings</Box>
-                      <Box as={RouterLink} to="/donations" py={2} onClick={onClose}>My Donations</Box>
                     </>
                   )}
                   
